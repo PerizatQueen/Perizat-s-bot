@@ -21,6 +21,16 @@ def tg_send(chat_id, text):
                   timeout=10)
 
 
+def tg_send_file(chat_id, file_path):
+    with open(file_path, "rb") as f:
+        requests.post(
+            f"{TG_API}/sendDocument",
+            data={"chat_id": chat_id},
+            files={"document": ("leads.csv", f, "text/csv")},
+            timeout=15
+        )
+
+
 def gpt_analyze(company_name):
     prompt = f"""Ты эксперт B2B продаж. Проанализируй компанию "{company_name}" для продажи CRM-системы.
 Наш продукт: CRM для отделов продаж. Целевые клиенты: компании 50+ сотрудников. Приоритет: IT, Финтех, Ритейл, Логистика, СНГ.
@@ -93,8 +103,20 @@ def webhook():
     if text.startswith("/start"):
         tg_send(chat_id,
                 "👋 <b>Квалификатор лидов</b>\n\n"
-                "Введите команду:\n<code>/lead Название компании</code>\n\n"
-                "Пример: <code>/lead Kaspi.kz</code>\n\nОтвет придёт через ~10 сек ✅")
+                "Команды:\n"
+                "<code>/lead Название компании</code> — анализ лида\n"
+                "<code>/getfile</code> — скачать таблицу leads.csv\n\n"
+                "Пример: <code>/lead Kaspi.kz</code>")
+
+    elif text.lower() == "/getfile":
+        if os.path.exists(CSV_PATH):
+            tg_send(chat_id, "📎 Отправляю файл leads.csv...")
+            try:
+                tg_send_file(chat_id, CSV_PATH)
+            except Exception as e:
+                tg_send(chat_id, f"❌ Не удалось отправить файл: <code>{str(e)[:200]}</code>")
+        else:
+            tg_send(chat_id, "⚠️ Файл пока пустой — сначала добавьте хотя бы один лид через <code>/lead</code>")
 
     elif text.lower().startswith("/lead"):
         parts = text.split(None, 1)
@@ -121,7 +143,8 @@ def webhook():
                 f"➕ Почему стоит:\n{reasons_lines}\n\n"
                 f"➖ Риски:\n{risks_lines}\n\n"
                 f"🎯 Действие: {data.get('recommended_action','—')}\n\n"
-                f"💾 Сохранено в leads.csv (всего: {total})"
+                f"💾 Сохранено в leads.csv (всего: {total})\n"
+                f"📥 Скачать таблицу: /getfile"
             )
             tg_send(chat_id, reply)
         except Exception as e:
